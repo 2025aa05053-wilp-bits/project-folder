@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import os
-import joblib
+import streamlit as st
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
@@ -22,16 +22,26 @@ from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 
 # -------------------------------
+# Streamlit UI
+# -------------------------------
+st.title("Bank Marketing Classification – Model Comparison")
+st.write(
+    "This application compares multiple machine learning classification models "
+    "on the Bank Marketing dataset using standard evaluation metrics."
+)
+
+# -------------------------------
 # Load dataset (Streamlit-safe)
 # -------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(BASE_DIR, "bank-additional-full.csv")
 
 if not os.path.exists(DATA_PATH):
-    raise FileNotFoundError(
-        f"Dataset not found at {DATA_PATH}. "
-        "Make sure bank-additional-full.csv is committed to GitHub."
+    st.error(
+        "Dataset file `bank-additional-full.csv` not found. "
+        "Please ensure it is committed to the GitHub repository root."
     )
+    st.stop()
 
 df = pd.read_csv(DATA_PATH, sep=";")
 
@@ -53,7 +63,11 @@ for col in X.columns:
 # Train-test split
 # -------------------------------
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42, stratify=y
+    X,
+    y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y
 )
 
 # -------------------------------
@@ -69,8 +83,8 @@ X_test = scaler.transform(X_test)
 models = {
     "Logistic Regression": LogisticRegression(max_iter=2000),
     "Decision Tree": DecisionTreeClassifier(random_state=42),
-    "KNN": KNeighborsClassifier(n_neighbors=5),
-    "Naive Bayes": GaussianNB(),
+    "K-Nearest Neighbor": KNeighborsClassifier(n_neighbors=5),
+    "Naive Bayes (Gaussian)": GaussianNB(),
     "Random Forest": RandomForestClassifier(
         n_estimators=200, random_state=42
     ),
@@ -82,26 +96,33 @@ models = {
 }
 
 # -------------------------------
-# Evaluation
+# Train & Evaluate
 # -------------------------------
 results = []
 
-for name, model in models.items():
-    model.fit(X_train, y_train)
+with st.spinner("Training models and computing evaluation metrics..."):
+    for name, model in models.items():
+        model.fit(X_train, y_train)
 
-    y_pred = model.predict(X_test)
-    y_proba = model.predict_proba(X_test)[:, 1]
+        y_pred = model.predict(X_test)
+        y_proba = model.predict_proba(X_test)[:, 1]
 
-    results.append({
-        "Model": name,
-        "Accuracy": accuracy_score(y_test, y_pred),
-        "AUC Score": roc_auc_score(y_test, y_proba),
-        "Precision": precision_score(y_test, y_pred),
-        "Recall": recall_score(y_test, y_pred),
-        "F1 Score": f1_score(y_test, y_pred),
-        "MCC": matthews_corrcoef(y_test, y_pred)
-    })
+        results.append({
+            "Model": name,
+            "Accuracy": accuracy_score(y_test, y_pred),
+            "AUC Score": roc_auc_score(y_test, y_proba),
+            "Precision": precision_score(y_test, y_pred),
+            "Recall": recall_score(y_test, y_pred),
+            "F1 Score": f1_score(y_test, y_pred),
+            "MCC": matthews_corrcoef(y_test, y_pred)
+        })
 
 results_df = pd.DataFrame(results)
-print("\nFINAL MODEL COMPARISON\n")
-print(results_df)
+
+# -------------------------------
+# Display Results
+# -------------------------------
+st.subheader("Final Model Comparison")
+st.dataframe(results_df, use_container_width=True)
+
+st.success("Model training and evaluation completed successfully.")
