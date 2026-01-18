@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import os
+import joblib
 
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
@@ -21,10 +22,16 @@ from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 
 # -------------------------------
-# Load dataset (STREAMLIT SAFE)
+# Load dataset (Streamlit-safe)
 # -------------------------------
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(BASE_DIR, "bank-additional-full.csv")
+
+if not os.path.exists(DATA_PATH):
+    raise FileNotFoundError(
+        f"Dataset not found at {DATA_PATH}. "
+        "Make sure bank-additional-full.csv is committed to GitHub."
+    )
 
 df = pd.read_csv(DATA_PATH, sep=";")
 
@@ -95,9 +102,6 @@ for name, model in models.items():
         "MCC": matthews_corrcoef(y_test, y_pred)
     })
 
-# -------------------------------
-# Display results
-# -------------------------------
 results_df = pd.DataFrame(results)
 print("\nFINAL MODEL COMPARISON\n")
 print(results_df)
