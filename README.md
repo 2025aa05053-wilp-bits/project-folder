@@ -71,5 +71,3 @@ The following table summarizes the performance of all models on the test dataset
 - MCC proved to be a useful metric for comparing models beyond accuracy.
 
 ---
-
-## Project Structure
