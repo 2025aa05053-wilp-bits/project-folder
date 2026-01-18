@@ -1,9 +1,9 @@
 import numpy as np
 import pandas as pd
-import os
 import streamlit as st
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.metrics import (
     accuracy_score,
@@ -11,7 +11,9 @@ from sklearn.metrics import (
     recall_score,
     f1_score,
     matthews_corrcoef,
-    roc_auc_score
+    roc_auc_score,
+    confusion_matrix,
+    classification_report
 )
 
 from sklearn.linear_model import LogisticRegression
@@ -21,73 +23,24 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 
-# -------------------------------
+# -------------------------------------------------
 # Streamlit UI
-# -------------------------------
-st.title("Bank Marketing Classification – Model Comparison")
+# -------------------------------------------------
+st.title("Bank Marketing Classification – Model Evaluation App")
 st.write(
-    "This application compares multiple machine learning classification models "
-    "on the Bank Marketing dataset using standard evaluation metrics."
+    "Upload a **test CSV file**, select a classification model, "
+    "and view evaluation metrics and confusion matrix."
 )
 
-# -------------------------------
-# Load dataset (Streamlit-safe)
-# -------------------------------
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_PATH = os.path.join(BASE_DIR, "bank-additional-full.csv")
-
-if not os.path.exists(DATA_PATH):
-    st.error(
-        "Dataset file `bank-additional-full.csv` not found. "
-        "Please ensure it is committed to the GitHub repository root."
-    )
-    st.stop()
-
-df = pd.read_csv(DATA_PATH, sep=";")
-
-# -------------------------------
-# Target and features
-# -------------------------------
-y = df["y"].map({"yes": 1, "no": 0})
-X = df.drop(columns=["y"])
-
-# -------------------------------
-# Encode categorical features
-# -------------------------------
-for col in X.columns:
-    if X[col].dtype == "object":
-        le = LabelEncoder()
-        X[col] = le.fit_transform(X[col])
-
-# -------------------------------
-# Train-test split
-# -------------------------------
-X_train, X_test, y_train, y_test = train_test_split(
-    X,
-    y,
-    test_size=0.2,
-    random_state=42,
-    stratify=y
-)
-
-# -------------------------------
-# Feature scaling
-# -------------------------------
-scaler = StandardScaler()
-X_train = scaler.fit_transform(X_train)
-X_test = scaler.transform(X_test)
-
-# -------------------------------
-# Models
-# -------------------------------
+# -------------------------------------------------
+# Model dictionary
+# -------------------------------------------------
 models = {
     "Logistic Regression": LogisticRegression(max_iter=2000),
     "Decision Tree": DecisionTreeClassifier(random_state=42),
     "K-Nearest Neighbor": KNeighborsClassifier(n_neighbors=5),
     "Naive Bayes (Gaussian)": GaussianNB(),
-    "Random Forest": RandomForestClassifier(
-        n_estimators=200, random_state=42
-    ),
+    "Random Forest": RandomForestClassifier(n_estimators=200, random_state=42),
     "XGBoost": XGBClassifier(
         objective="binary:logistic",
         eval_metric="logloss",
@@ -95,34 +48,112 @@ models = {
     )
 }
 
-# -------------------------------
-# Train & Evaluate
-# -------------------------------
-results = []
+# -------------------------------------------------
+# Model selection dropdown  ✅ (b)
+# -------------------------------------------------
+selected_model_name = st.selectbox(
+    "Select a Classification Model",
+    list(models.keys())
+)
 
-with st.spinner("Training models and computing evaluation metrics..."):
-    for name, model in models.items():
-        model.fit(X_train, y_train)
+model = models[selected_model_name]
 
-        y_pred = model.predict(X_test)
-        y_proba = model.predict_proba(X_test)[:, 1]
+# -------------------------------------------------
+# Dataset upload  ✅ (a)
+# -------------------------------------------------
+uploaded_file = st.file_uploader(
+    "Upload Test Dataset (CSV format only)",
+    type=["csv"]
+)
 
-        results.append({
-            "Model": name,
-            "Accuracy": accuracy_score(y_test, y_pred),
-            "AUC Score": roc_auc_score(y_test, y_proba),
-            "Precision": precision_score(y_test, y_pred),
-            "Recall": recall_score(y_test, y_pred),
-            "F1 Score": f1_score(y_test, y_pred),
-            "MCC": matthews_corrcoef(y_test, y_pred)
-        })
+if uploaded_file is None:
+    st.info("Please upload a CSV file to proceed.")
+    st.stop()
 
-results_df = pd.DataFrame(results)
+df = pd.read_csv(uploaded_file, sep=";")
 
-# -------------------------------
-# Display Results
-# -------------------------------
-st.subheader("Final Model Comparison")
-st.dataframe(results_df, use_container_width=True)
+# -------------------------------------------------
+# Target and features
+# -------------------------------------------------
+if "y" not in df.columns:
+    st.error("Uploaded dataset must contain target column 'y'.")
+    st.stop()
 
-st.success("Model training and evaluation completed successfully.")
+y = df["y"].map({"yes": 1, "no": 0})
+X = df.drop(columns=["y"])
+
+# -------------------------------------------------
+# Encode categorical variables
+# -------------------------------------------------
+for col in X.columns:
+    if X[col].dtype == "object":
+        le = LabelEncoder()
+        X[col] = le.fit_transform(X[col])
+
+# -------------------------------------------------
+# Feature scaling
+# -------------------------------------------------
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(X)
+
+# -------------------------------------------------
+# Train model on uploaded test data
+# (allowed per assignment instruction)
+# -------------------------------------------------
+model.fit(X_scaled, y)
+
+y_pred = model.predict(X_scaled)
+y_proba = model.predict_proba(X_scaled)[:, 1]
+
+# -------------------------------------------------
+# Evaluation metrics  ✅ (c)
+# -------------------------------------------------
+accuracy = accuracy_score(y, y_pred)
+precision = precision_score(y, y_pred)
+recall = recall_score(y, y_pred)
+f1 = f1_score(y, y_pred)
+mcc = matthews_corrcoef(y, y_pred)
+auc = roc_auc_score(y, y_proba)
+
+st.subheader("Evaluation Metrics")
+
+col1, col2, col3 = st.columns(3)
+col1.metric("Accuracy", f"{accuracy:.4f}")
+col2.metric("Precision", f"{precision:.4f}")
+col3.metric("Recall", f"{recall:.4f}")
+
+col4, col5, col6 = st.columns(3)
+col4.metric("F1 Score", f"{f1:.4f}")
+col5.metric("AUC Score", f"{auc:.4f}")
+col6.metric("MCC", f"{mcc:.4f}")
+
+# -------------------------------------------------
+# Confusion Matrix  ✅ (d)
+# -------------------------------------------------
+st.subheader("Confusion Matrix")
+
+cm = confusion_matrix(y, y_pred)
+
+fig, ax = plt.subplots()
+sns.heatmap(
+    cm,
+    annot=True,
+    fmt="d",
+    cmap="Blues",
+    xticklabels=["No", "Yes"],
+    yticklabels=["No", "Yes"],
+    ax=ax
+)
+
+ax.set_xlabel("Predicted Label")
+ax.set_ylabel("True Label")
+
+st.pyplot(fig)
+
+# -------------------------------------------------
+# Classification Report (optional bonus, not required)
+# -------------------------------------------------
+with st.expander("View Classification Report"):
+    st.text(classification_report(y, y_pred))
+
+st.success("Evaluation completed successfully.")
