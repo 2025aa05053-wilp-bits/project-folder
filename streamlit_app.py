@@ -1,6 +1,5 @@
 import numpy as np
 import pandas as pd
-import joblib
 import os
 
 from sklearn.model_selection import train_test_split
@@ -22,9 +21,12 @@ from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 
 # -------------------------------
-# Load dataset
+# Load dataset (STREAMLIT SAFE)
 # -------------------------------
-df = pd.read_csv("bank-additional-full.csv", sep=";")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_PATH = os.path.join(BASE_DIR, "bank-additional-full.csv")
+
+df = pd.read_csv(DATA_PATH, sep=";")
 
 # -------------------------------
 # Target and features
@@ -72,8 +74,6 @@ models = {
     )
 }
 
-os.makedirs("model", exist_ok=True)
-
 # -------------------------------
 # Evaluation
 # -------------------------------
@@ -94,11 +94,6 @@ for name, model in models.items():
         "F1 Score": f1_score(y_test, y_pred),
         "MCC": matthews_corrcoef(y_test, y_pred)
     })
-
-    joblib.dump(
-        model,
-        f"model/{name.replace(' ', '_').lower()}.pkl"
-    )
 
 # -------------------------------
 # Display results
